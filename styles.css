@@ -1,0 +1,23 @@
+body {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+  height: 150vh; /* Augmenter la hauteur totale de la page */
+}
+
+#globeContainer {
+  width: 100%;
+  max-width: 800px; /* Limite de largeur pour que le globe reste centré */
+  height: 100%; 
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+canvas {
+  width: 100%;
+  height: auto; /* Assurez-vous que le globe garde les bonnes proportions */
+}
