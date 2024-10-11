@@ -22,16 +22,18 @@ const sphere = { type: "Sphere" };
 
 let land110, currentRotation = projection.rotate(), isDragging = false;
 let lastRenderTime = 0;
-const renderThreshold = 16;
-const rotationSpeed = 0.08;
+const renderThreshold = 16; 
+const rotationSpeed = 0.08; 
+
 
 const regions = [
-  { name: "Amérique du Nord", coordinates: [[-170, 20], [-50, 50]] },
-  { name: "Europe", coordinates: [[-25, 35], [50, 72]] },
-  { name: "Amérique du Sud", coordinates: [[-80, -60], [-35, 10]] },
-  { name: "Afrique", coordinates: [[-20, -40], [50, 40]] },
-  { name: "Asie", coordinates: [[30, -10], [180, 70]] },
-  { name: "Océanie", coordinates: [[110, -50], [180, 10]] },
+  { name: "Amérique du Nord", coordinates: [[-170, 10], [-50, 75]], color: "#69b3a2" }, // Vert
+  { name: "Europe", coordinates: [[-25, 35], [50, 72]], color: "#ff0000" }, // Rouge
+  { name: "Amérique du Sud", coordinates: [[-80, -60], [-35, 15]], color: "#ffcc00" }, // Jaune
+  { name: "Afrique", coordinates: [[-20, -40], [50, 40]], color: "#ff7f50" }, // Corail
+  { name: "Asie", coordinates: [[30, -10], [180, 70]], color: "#00bfff" }, // Bleu
+  { name: "Océanie", coordinates: [[110, -50], [180, 10]], color: "#32cd32" }, // Vert lime
+  { name: "Antarctique", coordinates: [[-180, -90], [180, -60]], color: "#a9a9a9" } // Gris
 ];
 
 Promise.all([
@@ -39,38 +41,46 @@ Promise.all([
     land110 = topojson.feature(world, world.objects.countries);
   })
 ]).then(() => {
-  renderStatic(); 
+  renderStatic();
   d3.select(canvas).call(drag(projection));
-  animateRotation();
+  animateRotation(); 
 });
 
 function renderStatic() {
   context.clearRect(0, 0, width, height);
   
-  
+  // Dessiner l'océan
   context.beginPath();
   path(sphere);
   context.fillStyle = "#d3d3d3";
   context.fill();
   
+  // Dessiner les pays avec la couleur appropriée
+  land110.features.forEach(feature => {
+    const [longitude, latitude] = d3.geoCentroid(feature.geometry);
+    const region = regions.find(region => 
+      longitude >= region.coordinates[0][0] && longitude <= region.coordinates[1][0] &&
+      latitude >= region.coordinates[0][1] && latitude <= region.coordinates[1][1]
+    );
 
-  context.beginPath();
-  path(land110);
-  context.fillStyle = "#69b3a2"; 
-  context.fill();
+    context.beginPath();
+    path(feature);
+    context.fillStyle = region ? region.color : "#ffffff"; 
+    context.fill();
+    
+    // Bordure entre pays 
+    context.beginPath();
+    path(feature);
+    context.lineWidth = 0.5;
+    context.strokeStyle = "#000"; 
+    context.stroke();
+  });
   
-  
-  context.beginPath();
-  path(land110);
-  context.lineWidth = 0.5;
-  context.strokeStyle = "#000";  
-  context.stroke();
-  
-
+  // Dessiner la sphère (le globe)
   context.beginPath();
   path(sphere);
-  context.strokeStyle = "#000"; 
-  context.lineWidth = 1;  
+  context.strokeStyle = "#000";
+  context.lineWidth = 1; 
   context.stroke();
 }
 
@@ -81,12 +91,13 @@ function updateGlobeRotation() {
 
 function animateRotation() {
   if (!isDragging) {
-    
+  
     let rotation = projection.rotate();
-    rotation[0] -= rotationSpeed; // Sens de rotation
+  
+    rotation[0] -= rotationSpeed;
+   
     projection.rotate(rotation);
 
-  
     updateGlobeRotation();
   }
 
@@ -112,7 +123,7 @@ function drag(projection) {
   }
 
   function dragstarted(event) {
-    isDragging = true;  
+    isDragging = true;
     const [x, y] = d3.pointer(event);
     const dx = x - centerX;
     const dy = y - centerY;
