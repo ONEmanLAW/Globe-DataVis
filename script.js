@@ -1,7 +1,7 @@
 const width = window.innerWidth;
 const height = window.innerHeight;
 
-const globeRadius = 250;
+const globeRadius = 350;
 const centerX = width / 2;
 const centerY = height / 2;
 
@@ -20,7 +20,10 @@ const projection = d3.geoOrthographic()
 const path = d3.geoPath(projection, context);
 const sphere = { type: "Sphere" };
 
-let land50, land110;
+let land110, currentRotation = projection.rotate(), isDragging = false;
+let lastRenderTime = 0;
+const renderThreshold = 16;
+const rotationSpeed = 0.08;
 
 const regions = [
   { name: "Amérique du Nord", coordinates: [[-170, 20], [-50, 50]] },
@@ -34,42 +37,64 @@ const regions = [
 Promise.all([
   d3.json("https://d3js.org/world-110m.v1.json").then(world => {
     land110 = topojson.feature(world, world.objects.countries);
-  }),
-  d3.json("https://d3js.org/world-50m.v1.json").then(world => {
-    land50 = topojson.feature(world, world.objects.countries);
   })
 ]).then(() => {
-  render(land50);
+  renderStatic(); 
   d3.select(canvas).call(drag(projection));
+  animateRotation();
 });
 
-function render(land) {
+function renderStatic() {
   context.clearRect(0, 0, width, height);
-  context.beginPath();
-  context.rect(centerX - globeRadius, centerY - globeRadius, globeRadius * 2, globeRadius * 2);
-  context.strokeStyle = "#ff0000";
-  context.stroke();
-
+  
+  
   context.beginPath();
   path(sphere);
   context.fillStyle = "#d3d3d3";
   context.fill();
+  
 
   context.beginPath();
-  path(land);
-  context.fillStyle = "#69b3a2";
+  path(land110);
+  context.fillStyle = "#69b3a2"; 
   context.fill();
+  
+  
+  context.beginPath();
+  path(land110);
+  context.lineWidth = 0.5;
+  context.strokeStyle = "#000";  
+  context.stroke();
+  
 
   context.beginPath();
   path(sphere);
-  context.strokeStyle = "#fff";
+  context.strokeStyle = "#000"; 
+  context.lineWidth = 1;  
   context.stroke();
+}
+
+function updateGlobeRotation() {
+  context.clearRect(0, 0, width, height);
+  renderStatic();
+}
+
+function animateRotation() {
+  if (!isDragging) {
+    
+    let rotation = projection.rotate();
+    rotation[0] -= rotationSpeed; // Sens de rotation
+    projection.rotate(rotation);
+
+  
+    updateGlobeRotation();
+  }
+
+  requestAnimationFrame(animateRotation);
 }
 
 function drag(projection) {
   let v0, q0, r0, a0, l;
-  let lastRenderTime = 0;
-  const renderThreshold = 10;
 
   function pointer(event) {
     const t = d3.pointers(event);
@@ -87,6 +112,7 @@ function drag(projection) {
   }
 
   function dragstarted(event) {
+    isDragging = true;  
     const [x, y] = d3.pointer(event);
     const dx = x - centerX;
     const dy = y - centerY;
@@ -113,22 +139,18 @@ function drag(projection) {
     const v1 = versor.cartesian(projection.rotate(r0).invert([event.x, event.y]));
     const delta = versor.delta(v0, v1);
     let q1 = versor.multiply(q0, delta);
-    const p = pointer(event);
-
-    if (p[2]) {
-      const d = (p[2] - a0) / 2;
-      const s = -Math.sin(d);
-      const c = Math.sign(Math.cos(d));
-      q1 = versor.multiply([Math.sqrt(1 - s * s), 0, 0, c * s], q1);
-    }
 
     projection.rotate(versor.rotation(q1));
-    const currentTime = performance.now();
 
+    const currentTime = performance.now();
     if (currentTime - lastRenderTime > renderThreshold) {
       lastRenderTime = currentTime;
-      requestAnimationFrame(() => render(land110));
+      requestAnimationFrame(() => updateGlobeRotation());
     }
+  }
+
+  function dragended() {
+    isDragging = false;
   }
 
   canvas.addEventListener("click", (event) => {
@@ -172,7 +194,7 @@ function drag(projection) {
     const dy = y - centerY;
     const distanceFromCenter = Math.sqrt(dx * dx + dy * dy);
 
-    canvas.style.cursor = distanceFromCenter <= globeRadius ? "pointer" : "default";
+    canvas.style.cursor = distanceFromCenter <= globeRadius ? "grab" : "default";
   });
 
   canvas.addEventListener("mouseleave", () => {
@@ -181,5 +203,6 @@ function drag(projection) {
 
   return d3.drag()
     .on("start", dragstarted)
-    .on("drag", dragged);
+    .on("drag", dragged)
+    .on("end", dragended);
 }

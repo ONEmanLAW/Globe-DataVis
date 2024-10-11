@@ -5,12 +5,12 @@ body {
   justify-content: center;
   align-items: center;
   flex-direction: column;
-  height: 150vh; /* Augmenter la hauteur totale de la page */
+  height: 150vh; 
 }
 
 #globeContainer {
   width: 100%;
-  max-width: 800px; /* Limite de largeur pour que le globe reste centré */
+  max-width: 800px; 
   height: 100%; 
   display: flex;
   justify-content: center;
@@ -19,5 +19,5 @@ body {
 
 canvas {
   width: 100%;
-  height: auto; /* Assurez-vous que le globe garde les bonnes proportions */
+  height: auto; 
 }
