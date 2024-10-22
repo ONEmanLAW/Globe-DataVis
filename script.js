@@ -37,25 +37,25 @@ Promise.all([
   }
 });
 
-// Function to update the canvas size while maintaining the aspect ratio
+
 function updateCanvasSize() {
   canvasWidth = window.innerWidth;
   canvasHeight = window.innerHeight;
 
   const newAspectRatio = canvasWidth / canvasHeight;
-  // Maintain the globe's aspect ratio
+ 
   if (newAspectRatio !== aspectRatio) {
-    // Adjust projection scale and translation based on the new size
+
     projection.translate([canvasWidth / 2, canvasHeight / 2]);
-    projection.scale(globeRadius); // Keep radius constant
-    renderStatic(); // Re-render the globe
+    projection.scale(globeRadius); 
+    renderStatic();
   }
 
   canvas.setAttribute("width", canvasWidth);
   canvas.setAttribute("height", canvasHeight);
 }
 
-// Event listener for window resize
+
 window.addEventListener("resize", updateCanvasSize);
 
 function renderStatic() {
