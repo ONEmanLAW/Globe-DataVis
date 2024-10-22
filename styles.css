@@ -5,7 +5,6 @@ body {
   justify-content: center;
   align-items: center;
   flex-direction: column;
-  height: 150vh; 
 }
 
 #globeContainer {
@@ -15,17 +14,18 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
+  
 }
 
 canvas {
   width: 100%;
   height: auto; 
+  
 }
 
 #infoContainer {
   background-color: #f9f9f9;
   border: 1px solid #ccc;
   border-radius: 5px;
-  padding: 10px;
   width: 300px;
 }
