@@ -20,8 +20,8 @@ const sphere = { type: "Sphere" };
 let continent, continentData;
 let isDragging = false, isMouseDown = false, inGlobe = false;
 let lastRenderTime = 0;
-const renderThreshold = 16; // ms
-const rotationSpeed = 0.08; // degrees per frame
+const renderThreshold = 16; 
+const rotationSpeed = 0.08; 
 
 Promise.all([
   d3.json("continents.topojson").then(topo => {
@@ -41,13 +41,13 @@ Promise.all([
 function renderStatic() {
   context.clearRect(0, 0, width, height);
 
-  // Dessiner l'océan
+  // L'océan
   context.fillStyle = "#d3d3d3";
   context.beginPath();
   path(sphere);
   context.fill();
 
-  // Dessiner les continents
+  // Continents
   continent.features.forEach(feature => {
     context.fillStyle = getColorForContinent(feature.properties.continent);
     context.beginPath();
@@ -111,7 +111,7 @@ function drag(projection) {
     const [x, y] = d3.pointer(event);
     
     if (isInsideGlobe(x, y)) {
-      canvas.style.cursor = "grab"; // Changer le curseur lors du clic
+      canvas.style.cursor = "grab"; 
       isDragging = true;
       isMouseDown = true;
       inGlobe = true;
@@ -121,23 +121,23 @@ function drag(projection) {
   }
 
   function dragged(event) {
-    if (!inGlobe) return; // Arrêter la fonction si la souris n'est pas dans le globe
+    if (!inGlobe) return; 
 
     const [x, y] = d3.pointer(event);
     
     if (!isInsideGlobe(x, y)) {
-      dragended(); // Terminer le glissement si la souris sort du globe
+      dragended(); 
       return;
     }
 
-    canvas.style.cursor = "grabbing"; // Changer le curseur lors du glissement
+    canvas.style.cursor = "grabbing"; 
 
     const v1 = versor.cartesian(projection.rotate(r0).invert([event.x, event.y]));
     const delta = versor.delta(v0, v1);
     const q1 = versor.multiply(q0, delta);
     projection.rotate(versor.rotation(q1));
 
-    // Limiter le rendu à un certain seuil
+   
     const currentTime = performance.now();
     if (currentTime - lastRenderTime > renderThreshold) {
       lastRenderTime = currentTime;
@@ -149,8 +149,8 @@ function drag(projection) {
     if (inGlobe) {
       isMouseDown = false;
       isDragging = false;
-      inGlobe = false; // Reset inGlobe on drag end
-      canvas.style.cursor = "default"; // Revenir au curseur par défaut
+      inGlobe = false; 
+      canvas.style.cursor = "default"; 
     }
   }
 
@@ -166,18 +166,18 @@ function drag(projection) {
     const [x, y] = d3.pointer(event);
     if (isInsideGlobe(x, y)) {
       isMouseDown = true;
-      canvas.style.cursor = "grab"; // Changer le curseur au moment du clic
+      canvas.style.cursor = "grab";
     }
   });
 
   canvas.addEventListener("mouseup", () => {
     isMouseDown = false;
-    canvas.style.cursor = "default"; // Revenir au curseur par défaut
+    canvas.style.cursor = "default"; 
   });
 
   canvas.addEventListener("mousemove", (event) => {
     const [x, y] = d3.pointer(event);
-    // Ne changez pas le curseur à moins que l'utilisateur soit en train de glisser
+ 
     canvas.style.cursor = isMouseDown && inGlobe ? "grabbing" : "default";
   });
 
