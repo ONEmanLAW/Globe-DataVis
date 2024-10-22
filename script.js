@@ -9,7 +9,6 @@ const canvas = d3.select("#globeCanvas")
   .attr("height", height)
   .node();
 
-canvas.style.cursor = "default";
 const context = canvas.getContext("2d");
 const projection = d3.geoOrthographic()
   .scale(globeRadius)
@@ -18,57 +17,54 @@ const projection = d3.geoOrthographic()
 const path = d3.geoPath(projection, context);
 const sphere = { type: "Sphere" };
 
-let land110, isDragging = false;
+let continent, continentData, isDragging = false;
 let lastRenderTime = 0;
 const renderThreshold = 16;
 const rotationSpeed = 0.08;
 
-// Définition des régions
-const regions = [
-  { name: "Amérique du Nord", coordinates: [[-170, 10], [-50, 75]], color: "#69b3a2" },
-  { name: "Europe", coordinates: [[-25, 35], [50, 72]], color: "#ff0000" },
-  { name: "Amérique du Sud", coordinates: [[-80, -60], [-35, 15]], color: "#ffcc00" },
-  { name: "Afrique", coordinates: [[-20, -40], [50, 40]], color: "#ff7f50" },
-  { name: "Asie", coordinates: [[30, -10], [180, 70]], color: "#00bfff" },
-  { name: "Océanie", coordinates: [[110, -50], [180, 10]], color: "#32cd32" },
-  { name: "Antarctique", coordinates: [[-180, -90], [180, -60]], color: "#a9a9a9" }
-];
-
-// Chargement des données géographiques
 Promise.all([
-  d3.json("https://d3js.org/world-110m.v1.json").then(world => {
-    land110 = topojson.feature(world, world.objects.countries);
+  d3.json("continents.topojson").then(topo => {
+    console.log("TopoJSON chargé :", topo);
+    
+    if (topo.objects && topo.objects.continent) {
+      continent = topojson.feature(topo, topo.objects.continent);
+      console.log("Géométries extraites :", continent);
+    } else {
+      console.error("L'objet continent n'existe pas dans le TopoJSON.");
+    }
+  }).catch(error => {
+    console.error("Erreur lors du chargement du TopoJSON :", error);
+  }),
+
+  d3.json("data.json").then(data => {
+    console.log("Données supplémentaires chargées :", data);
+    continentData = data.continent;
+  }).catch(error => {
+    console.error("Erreur lors du chargement des données supplémentaires :", error);
   })
 ]).then(() => {
-  renderStatic();
-  d3.select(canvas).call(drag(projection));
-  animateRotation();
+  if (continent && continentData) {
+    renderStatic();
+    d3.select(canvas).call(drag(projection));
+    animateRotation();
+  } else {
+    console.error("Les données nécessaires n'ont pas été chargées correctement.");
+  }
 });
 
-// Fonction pour dessiner le globe
 function renderStatic() {
   context.clearRect(0, 0, width, height);
 
-  // Dessiner l'océan
   context.fillStyle = "#d3d3d3";
   context.beginPath();
   path(sphere);
   context.fill();
 
-  // Dessiner les pays
-  land110.features.forEach(feature => {
-    const [longitude, latitude] = d3.geoCentroid(feature.geometry);
-    const region = regions.find(region =>
-      longitude >= region.coordinates[0][0] && longitude <= region.coordinates[1][0] &&
-      latitude >= region.coordinates[0][1] && latitude <= region.coordinates[1][1]
-    );
-
-    context.fillStyle = region ? region.color : "#ffffff";
+  continent.features.forEach(feature => {
+    context.fillStyle = getColorForContinent(feature.properties.continent);
     context.beginPath();
     path(feature);
     context.fill();
-
-    // Bordure entre pays
     context.strokeStyle = "#000";
     context.lineWidth = 0.5;
     context.beginPath();
@@ -76,7 +72,6 @@ function renderStatic() {
     context.stroke();
   });
 
-  // Dessiner la sphère (le globe)
   context.strokeStyle = "#000";
   context.lineWidth = 1;
   context.beginPath();
@@ -84,13 +79,23 @@ function renderStatic() {
   context.stroke();
 }
 
-// Mettre à jour la rotation du globe
+function getColorForContinent(name) {
+  switch (name) {
+    case "South America": return "#ffcc00";
+    case "North America": return "#69b3a2";
+    case "Europe": return "#ff0000";
+    case "Africa": return "#ff7f50";
+    case "Asia": return "#00bfff";
+    case "Oceania": return "#32cd32";
+    case "Antarctica": return "#a9a9a9";
+    default: return "#ffffff";
+  }
+}
+
 function updateGlobeRotation() {
-  context.clearRect(0, 0, width, height);
   renderStatic();
 }
 
-// Animer la rotation du globe
 function animateRotation() {
   if (!isDragging) {
     const rotation = projection.rotate();
@@ -101,7 +106,6 @@ function animateRotation() {
   requestAnimationFrame(animateRotation);
 }
 
-// Gestion du drag
 function drag(projection) {
   let v0, q0, r0, l;
 
@@ -177,23 +181,17 @@ function drag(projection) {
     .on("end", dragended);
 }
 
-// Fonction pour gérer les clics
 function handleClick([longitude, latitude]) {
-  const clickedRegion = regions.find(region =>
-    longitude >= region.coordinates[0][0] && longitude <= region.coordinates[1][0] &&
-    latitude >= region.coordinates[0][1] && latitude <= region.coordinates[1][1]
-  );
-
-  if (clickedRegion) {
-    alert(`Vous avez cliqué sur : ${clickedRegion.name}`);
-    return;
-  }
-
-  const clickedCountry = land110.features.find(feature =>
+  const clickedContinent = continent.features.find(feature =>
     d3.geoContains(feature.geometry, [longitude, latitude])
   );
 
-  if (clickedCountry) {
-    alert(`Vous avez cliqué sur : ${clickedCountry.properties.name}`);
+  if (clickedContinent) {
+    const continentName = clickedContinent.properties.continent;
+    const continentInfo = continentData.find(continent => continent.name === continentName);
+    
+    if (continentInfo) {
+      alert(`Vous avez cliqué sur : ${continentName}\nPopulation: ${continentInfo.population}\nPIB: ${continentInfo.gdp}`);
+    }
   }
 }
