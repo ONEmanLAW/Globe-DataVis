@@ -9,6 +9,7 @@ const canvas = d3.select("#globeCanvas")
   .attr("height", height)
   .node();
 
+canvas.style.cursor = "default";
 const context = canvas.getContext("2d");
 const projection = d3.geoOrthographic()
   .scale(globeRadius)
@@ -17,7 +18,7 @@ const projection = d3.geoOrthographic()
 const path = d3.geoPath(projection, context);
 const sphere = { type: "Sphere" };
 
-let continent, continentData, isDragging = false;
+let continent, continentData, isDragging = false, isMouseDown = false, inGlobe = false;
 let lastRenderTime = 0;
 const renderThreshold = 16;
 const rotationSpeed = 0.08;
@@ -25,7 +26,6 @@ const rotationSpeed = 0.08;
 Promise.all([
   d3.json("continents.topojson").then(topo => {
     console.log("TopoJSON chargé :", topo);
-    
     if (topo.objects && topo.objects.continent) {
       continent = topojson.feature(topo, topo.objects.continent);
       console.log("Géométries extraites :", continent);
@@ -55,16 +55,24 @@ Promise.all([
 function renderStatic() {
   context.clearRect(0, 0, width, height);
 
+  // L'océan
   context.fillStyle = "#d3d3d3";
   context.beginPath();
   path(sphere);
   context.fill();
 
+  // Continents
   continent.features.forEach(feature => {
+    const [longitude, latitude] = d3.geoCentroid(feature.geometry);
+    const continentInfo = continentData.find(continent =>
+      continent.name === feature.properties.continent
+    );
+
     context.fillStyle = getColorForContinent(feature.properties.continent);
     context.beginPath();
     path(feature);
     context.fill();
+
     context.strokeStyle = "#000";
     context.lineWidth = 0.5;
     context.beginPath();
@@ -72,6 +80,7 @@ function renderStatic() {
     context.stroke();
   });
 
+  // Dessiner la sphère (le globe)
   context.strokeStyle = "#000";
   context.lineWidth = 1;
   context.beginPath();
@@ -93,11 +102,12 @@ function getColorForContinent(name) {
 }
 
 function updateGlobeRotation() {
+  context.clearRect(0, 0, width, height);
   renderStatic();
 }
 
 function animateRotation() {
-  if (!isDragging) {
+  if (!isDragging && !isMouseDown) {
     const rotation = projection.rotate();
     rotation[0] -= rotationSpeed;
     projection.rotate(rotation);
@@ -124,17 +134,25 @@ function drag(projection) {
   }
 
   function dragstarted(event) {
-    isDragging = true;
     const [x, y] = d3.pointer(event);
-    if (isOutOfBounds(x, y)) return;
-
-    v0 = versor.cartesian(projection.invert([event.x, event.y]));
-    q0 = versor(r0 = projection.rotate());
+    
+    if (isInsideGlobe(x, y)) {
+      canvas.style.cursor = "grab";
+      isDragging = true;
+      isMouseDown = true;
+      inGlobe = true;
+      v0 = versor.cartesian(projection.invert([event.x, event.y]));
+      q0 = versor(r0 = projection.rotate());
+    } else {
+      inGlobe = false;
+    }
   }
 
   function dragged(event) {
+    if (!inGlobe) return;
+
     const [x, y] = d3.pointer(event);
-    if (isOutOfBounds(x, y)) return;
+    canvas.style.cursor = "grabbing";
 
     const v1 = versor.cartesian(projection.rotate(r0).invert([event.x, event.y]));
     const delta = versor.delta(v0, v1);
@@ -149,30 +167,45 @@ function drag(projection) {
   }
 
   function dragended() {
-    isDragging = false;
+    if (inGlobe) {
+      isMouseDown = false;
+      isDragging = false;
+      canvas.style.cursor = "default";
+    }
   }
 
-  function isOutOfBounds(x, y) {
+  function isInsideGlobe(x, y) {
     const dx = x - centerX;
     const dy = y - centerY;
-    return Math.sqrt(dx * dx + dy * dy) > globeRadius;
+    // Dans le globe ?
+    return Math.sqrt(dx * dx + dy * dy) <= globeRadius;
   }
 
   canvas.addEventListener("click", (event) => {
     const [x, y] = d3.pointer(event);
-    if (isOutOfBounds(x, y)) return;
+    if (!isInsideGlobe(x, y)) return;
 
     const coords = projection.invert([x, y]);
     handleClick(coords);
   });
 
-  canvas.addEventListener("mousemove", (event) => {
+  canvas.addEventListener("mousedown", (event) => {
     const [x, y] = d3.pointer(event);
-    canvas.style.cursor = isOutOfBounds(x, y) ? "default" : "grab";
+    if (isInsideGlobe(x, y)) {
+      isMouseDown = true;
+      canvas.style.cursor = "grab";
+    }
   });
 
-  canvas.addEventListener("mouseleave", () => {
+  canvas.addEventListener("mouseup", () => {
+    isMouseDown = false;
     canvas.style.cursor = "default";
+  });
+
+  canvas.addEventListener("mousemove", (event) => {
+    const [x, y] = d3.pointer(event);
+    // Dans le globe ? 
+    canvas.style.cursor = isInsideGlobe(x, y) ? "default" : "default";
   });
 
   return d3.drag()
