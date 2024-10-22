@@ -1,6 +1,6 @@
 const width = window.innerWidth;
 const height = window.innerHeight;
-const globeRadius = 350;
+const globeRadius = 300;
 const centerX = width / 2;
 const centerY = height / 2;
 
@@ -20,8 +20,8 @@ const sphere = { type: "Sphere" };
 let continent, continentData;
 let isDragging = false, isMouseDown = false, inGlobe = false;
 let lastRenderTime = 0;
-const renderThreshold = 16; 
-const rotationSpeed = 0.08; 
+const renderThreshold = 16; // ms
+const rotationSpeed = 0.08; // degrees per frame
 
 Promise.all([
   d3.json("continents.topojson").then(topo => {
@@ -41,13 +41,11 @@ Promise.all([
 function renderStatic() {
   context.clearRect(0, 0, width, height);
 
-  // L'océan
   context.fillStyle = "#d3d3d3";
   context.beginPath();
   path(sphere);
   context.fill();
 
-  // Continents
   continent.features.forEach(feature => {
     context.fillStyle = getColorForContinent(feature.properties.continent);
     context.beginPath();
@@ -61,7 +59,6 @@ function renderStatic() {
     context.stroke();
   });
 
-  // Dessiner la sphère (le globe)
   context.strokeStyle = "#000";
   context.lineWidth = 1;
   context.beginPath();
@@ -109,9 +106,8 @@ function drag(projection) {
 
   function dragstarted(event) {
     const [x, y] = d3.pointer(event);
-    
     if (isInsideGlobe(x, y)) {
-      canvas.style.cursor = "grab"; 
+      canvas.style.cursor = "grab";
       isDragging = true;
       isMouseDown = true;
       inGlobe = true;
@@ -121,23 +117,20 @@ function drag(projection) {
   }
 
   function dragged(event) {
-    if (!inGlobe) return; 
+    if (!inGlobe) return;
 
     const [x, y] = d3.pointer(event);
-    
     if (!isInsideGlobe(x, y)) {
-      dragended(); 
+      dragended();
       return;
     }
 
-    canvas.style.cursor = "grabbing"; 
-
+    canvas.style.cursor = "grabbing";
     const v1 = versor.cartesian(projection.rotate(r0).invert([event.x, event.y]));
     const delta = versor.delta(v0, v1);
     const q1 = versor.multiply(q0, delta);
     projection.rotate(versor.rotation(q1));
 
-   
     const currentTime = performance.now();
     if (currentTime - lastRenderTime > renderThreshold) {
       lastRenderTime = currentTime;
@@ -149,8 +142,8 @@ function drag(projection) {
     if (inGlobe) {
       isMouseDown = false;
       isDragging = false;
-      inGlobe = false; 
-      canvas.style.cursor = "default"; 
+      inGlobe = false;
+      canvas.style.cursor = "default";
     }
   }
 
@@ -172,12 +165,11 @@ function drag(projection) {
 
   canvas.addEventListener("mouseup", () => {
     isMouseDown = false;
-    canvas.style.cursor = "default"; 
+    canvas.style.cursor = "default";
   });
 
   canvas.addEventListener("mousemove", (event) => {
     const [x, y] = d3.pointer(event);
- 
     canvas.style.cursor = isMouseDown && inGlobe ? "grabbing" : "default";
   });
 
@@ -197,7 +189,9 @@ function handleClick([longitude, latitude]) {
     const continentInfo = continentData.find(continent => continent.name === continentName);
     
     if (continentInfo) {
-      alert(`Vous avez cliqué sur : ${continentName}\nPopulation: ${continentInfo.population}\nPIB: ${continentInfo.gdp}`);
+      document.getElementById("continentName").textContent = `Vous avez cliqué sur : ${continentName}`;
+      document.getElementById("continentPopulation").textContent = `Population: ${continentInfo.population}`;
+      document.getElementById("continentGDP").textContent = `PIB: ${continentInfo.gdp}`;
     }
   }
 }
