@@ -18,50 +18,36 @@ const path = d3.geoPath(projection, context);
 const sphere = { type: "Sphere" };
 
 let continent, continentData;
-let isDragging = false;
-let isMouseDown = false;
+let isDragging = false, isMouseDown = false, inGlobe = false;
 let lastRenderTime = 0;
-const renderThreshold = 16;
-const rotationSpeed = 0.08;
+const renderThreshold = 16; // ms
+const rotationSpeed = 0.08; // degrees per frame
 
-// Chargement des données géographiques et des données supplémentaires
 Promise.all([
   d3.json("continents.topojson").then(topo => {
-    console.log("TopoJSON chargé :", topo);
-    if (topo.objects && topo.objects.continent) {
-      continent = topojson.feature(topo, topo.objects.continent);
-      console.log("Géométries extraites :", continent);
-    } else {
-      console.error("L'objet continent n'existe pas dans le TopoJSON.");
-    }
-  }).catch(error => {
-    console.error("Erreur lors du chargement du TopoJSON :", error);
+    continent = topojson.feature(topo, topo.objects.continent);
   }),
-
   d3.json("data.json").then(data => {
-    console.log("Données supplémentaires chargées :", data);
     continentData = data.continent;
-  }).catch(error => {
-    console.error("Erreur lors du chargement des données supplémentaires :", error);
   })
 ]).then(() => {
   if (continent && continentData) {
     renderStatic();
     d3.select(canvas).call(drag(projection));
     animateRotation();
-  } else {
-    console.error("Les données nécessaires n'ont pas été chargées correctement.");
   }
 });
 
-// Fonction pour dessiner le globe
 function renderStatic() {
   context.clearRect(0, 0, width, height);
+
+  // Dessiner l'océan
   context.fillStyle = "#d3d3d3";
   context.beginPath();
   path(sphere);
   context.fill();
 
+  // Dessiner les continents
   continent.features.forEach(feature => {
     context.fillStyle = getColorForContinent(feature.properties.continent);
     context.beginPath();
@@ -75,6 +61,7 @@ function renderStatic() {
     context.stroke();
   });
 
+  // Dessiner la sphère (le globe)
   context.strokeStyle = "#000";
   context.lineWidth = 1;
   context.beginPath();
@@ -82,26 +69,25 @@ function renderStatic() {
   context.stroke();
 }
 
-// Fonction pour obtenir la couleur d'un continent
 function getColorForContinent(name) {
-  switch (name) {
-    case "South America": return "#ffcc00";
-    case "North America": return "#69b3a2";
-    case "Europe": return "#ff0000";
-    case "Africa": return "#ff7f50";
-    case "Asia": return "#00bfff";
-    case "Oceania": return "#32cd32";
-    case "Antarctica": return "#a9a9a9";
-    default: return "#ffffff";
-  }
+  const colors = {
+    "South America": "#ffcc00",
+    "North America": "#69b3a2",
+    "Europe": "#ff0000",
+    "Africa": "#ff7f50",
+    "Asia": "#00bfff",
+    "Oceania": "#32cd32",
+    "Antarctica": "#a9a9a9",
+    "default": "#ffffff"
+  };
+  return colors[name] || colors.default;
 }
 
-// Mettre à jour la rotation du globe
 function updateGlobeRotation() {
+  context.clearRect(0, 0, width, height);
   renderStatic();
 }
 
-// Animer la rotation du globe
 function animateRotation() {
   if (!isDragging && !isMouseDown) {
     const rotation = projection.rotate();
@@ -113,34 +99,45 @@ function animateRotation() {
 }
 
 function drag(projection) {
-  let v0, q0, r0, l;
+  let v0, q0, r0;
 
-  function pointer(event) {
-    const t = d3.pointers(event);
-    return l > 1 ? [d3.mean(t, p => p[0]), d3.mean(t, p => p[1])] : t[0];
+  function isInsideGlobe(x, y) {
+    const dx = x - centerX;
+    const dy = y - centerY;
+    return Math.sqrt(dx * dx + dy * dy) <= globeRadius;
   }
 
   function dragstarted(event) {
-    const [x, y] = pointer(event);
+    const [x, y] = d3.pointer(event);
+    
     if (isInsideGlobe(x, y)) {
-      canvas.style.cursor = "grab";
+      canvas.style.cursor = "grab"; // Changer le curseur lors du clic
       isDragging = true;
       isMouseDown = true;
-      v0 = versor.cartesian(projection.invert([x, y]));
+      inGlobe = true;
+      v0 = versor.cartesian(projection.invert([event.x, event.y]));
       q0 = versor(r0 = projection.rotate());
     }
   }
 
   function dragged(event) {
-    const [x, y] = pointer(event);
-    if (!isInsideGlobe(x, y)) return;
+    if (!inGlobe) return; // Arrêter la fonction si la souris n'est pas dans le globe
 
-    canvas.style.cursor = "grabbing";
-    const v1 = versor.cartesian(projection.rotate(r0).invert([x, y]));
+    const [x, y] = d3.pointer(event);
+    
+    if (!isInsideGlobe(x, y)) {
+      dragended(); // Terminer le glissement si la souris sort du globe
+      return;
+    }
+
+    canvas.style.cursor = "grabbing"; // Changer le curseur lors du glissement
+
+    const v1 = versor.cartesian(projection.rotate(r0).invert([event.x, event.y]));
     const delta = versor.delta(v0, v1);
     const q1 = versor.multiply(q0, delta);
     projection.rotate(versor.rotation(q1));
 
+    // Limiter le rendu à un certain seuil
     const currentTime = performance.now();
     if (currentTime - lastRenderTime > renderThreshold) {
       lastRenderTime = currentTime;
@@ -149,40 +146,39 @@ function drag(projection) {
   }
 
   function dragended() {
-    isMouseDown = false;
-    isDragging = false;
-    canvas.style.cursor = "default";
-  }
-
-  function isInsideGlobe(x, y) {
-    const dx = x - centerX;
-    const dy = y - centerY;
-    return Math.sqrt(dx * dx + dy * dy) <= globeRadius;
+    if (inGlobe) {
+      isMouseDown = false;
+      isDragging = false;
+      inGlobe = false; // Reset inGlobe on drag end
+      canvas.style.cursor = "default"; // Revenir au curseur par défaut
+    }
   }
 
   canvas.addEventListener("click", (event) => {
-    const [x, y] = pointer(event);
-    if (!isInsideGlobe(x, y)) return;
-    const coords = projection.invert([x, y]);
-    handleClick(coords);
+    const [x, y] = d3.pointer(event);
+    if (isInsideGlobe(x, y)) {
+      const coords = projection.invert([x, y]);
+      handleClick(coords);
+    }
   });
 
   canvas.addEventListener("mousedown", (event) => {
-    const [x, y] = pointer(event);
+    const [x, y] = d3.pointer(event);
     if (isInsideGlobe(x, y)) {
       isMouseDown = true;
-      canvas.style.cursor = "grab";
+      canvas.style.cursor = "grab"; // Changer le curseur au moment du clic
     }
   });
 
   canvas.addEventListener("mouseup", () => {
     isMouseDown = false;
-    canvas.style.cursor = "default";
+    canvas.style.cursor = "default"; // Revenir au curseur par défaut
   });
 
   canvas.addEventListener("mousemove", (event) => {
-    const [x, y] = pointer(event);
-    canvas.style.cursor = isInsideGlobe(x, y) ? (isMouseDown ? "grabbing" : "grab") : "default";
+    const [x, y] = d3.pointer(event);
+    // Ne changez pas le curseur à moins que l'utilisateur soit en train de glisser
+    canvas.style.cursor = isMouseDown && inGlobe ? "grabbing" : "default";
   });
 
   return d3.drag()
