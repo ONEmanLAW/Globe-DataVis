@@ -1,18 +1,17 @@
-const width = window.innerWidth;
-const height = window.innerHeight;
 const globeRadius = 300;
-const centerX = width / 2;
-const centerY = height / 2;
+let canvasWidth = window.innerWidth;
+let canvasHeight = window.innerHeight;
+const aspectRatio = canvasWidth / canvasHeight;
 
 const canvas = d3.select("#globeCanvas")
-  .attr("width", width)
-  .attr("height", height)
+  .attr("width", canvasWidth)
+  .attr("height", canvasHeight)
   .node();
 
 const context = canvas.getContext("2d");
 const projection = d3.geoOrthographic()
   .scale(globeRadius)
-  .translate([centerX, centerY])
+  .translate([canvasWidth / 2, canvasHeight / 2])
   .clipAngle(90);
 const path = d3.geoPath(projection, context);
 const sphere = { type: "Sphere" };
@@ -20,8 +19,8 @@ const sphere = { type: "Sphere" };
 let continent, continentData;
 let isDragging = false, isMouseDown = false, inGlobe = false;
 let lastRenderTime = 0;
-const renderThreshold = 16; // ms
-const rotationSpeed = 0.08; // degrees per frame
+const renderThreshold = 16;
+const rotationSpeed = 0.08; 
 
 Promise.all([
   d3.json("continents.topojson").then(topo => {
@@ -38,14 +37,37 @@ Promise.all([
   }
 });
 
-function renderStatic() {
-  context.clearRect(0, 0, width, height);
+// Function to update the canvas size while maintaining the aspect ratio
+function updateCanvasSize() {
+  canvasWidth = window.innerWidth;
+  canvasHeight = window.innerHeight;
 
+  const newAspectRatio = canvasWidth / canvasHeight;
+  // Maintain the globe's aspect ratio
+  if (newAspectRatio !== aspectRatio) {
+    // Adjust projection scale and translation based on the new size
+    projection.translate([canvasWidth / 2, canvasHeight / 2]);
+    projection.scale(globeRadius); // Keep radius constant
+    renderStatic(); // Re-render the globe
+  }
+
+  canvas.setAttribute("width", canvasWidth);
+  canvas.setAttribute("height", canvasHeight);
+}
+
+// Event listener for window resize
+window.addEventListener("resize", updateCanvasSize);
+
+function renderStatic() {
+  context.clearRect(0, 0, canvasWidth, canvasHeight);
+
+  // L'océan
   context.fillStyle = "#d3d3d3";
   context.beginPath();
   path(sphere);
   context.fill();
 
+  // Continents
   continent.features.forEach(feature => {
     context.fillStyle = getColorForContinent(feature.properties.continent);
     context.beginPath();
@@ -59,6 +81,7 @@ function renderStatic() {
     context.stroke();
   });
 
+  // Dessiner la sphère (le globe)
   context.strokeStyle = "#000";
   context.lineWidth = 1;
   context.beginPath();
@@ -81,7 +104,7 @@ function getColorForContinent(name) {
 }
 
 function updateGlobeRotation() {
-  context.clearRect(0, 0, width, height);
+  context.clearRect(0, 0, canvasWidth, canvasHeight);
   renderStatic();
 }
 
@@ -99,8 +122,8 @@ function drag(projection) {
   let v0, q0, r0;
 
   function isInsideGlobe(x, y) {
-    const dx = x - centerX;
-    const dy = y - centerY;
+    const dx = x - (canvasWidth / 2);
+    const dy = y - (canvasHeight / 2);
     return Math.sqrt(dx * dx + dy * dy) <= globeRadius;
   }
 
